@@ -1,9 +1,4 @@
-Perfeito, ajustei o link do LinkedIn.
-Segue o **README.md** final, já revisado e pronto para uso no GitHub:
 
----
-
-```markdown
 # 📚 Educare — Plataforma Figital de Aprendizagem Inclusiva
 
 > **Educare** é um protótipo *figital* (físico + digital) que conecta hardware baseado em ESP32 a um aplicativo Flutter, promovendo uma aprendizagem mais acessível, engajadora e adaptada para crianças com necessidades especiais, especialmente aquelas no **Transtorno do Espectro Autista (TEA)**.
