@@ -23,3 +23,113 @@ Combinamos **interação física** e **inteligência digital** para criar experi
 
 ## 🛠 Estrutura do Projeto
 
+educare/
+│
+├── flutter_application/ # Aplicativo Flutter
+│ ├── lib/
+│ │ ├── main.dart # App principal e UI
+│ │ └── services/ # Serviços de conexão Bluetooth
+│ ├── pubspec.yaml # Configurações e dependências
+│
+├── esp32_firmware/ # Código Arduino para o ESP32
+│ └── educare_esp32.ino
+│
+└── docs/ # Documentação e futuros recursos visuais
+
+
+---
+
+## 📲 Aplicativo Flutter
+
+### 🔹 Tecnologias usadas
+- [Flutter](https://flutter.dev/) 3.x
+- [`flutter_bluetooth_serial`](https://pub.dev/packages/flutter_bluetooth_serial) (modificado localmente)
+- [Permission Handler](https://pub.dev/packages/permission_handler) para Android 12+
+
+Entendi, você quer que eu **corrija e formate** essa parte para que fique consistente e profissional dentro do README.
+Segue a versão ajustada e organizada:
+
+---
+
+
+### 🔹 Instalação
+
+```bash
+# Clonar o repositório
+git clone https://github.com/seu-usuario/educare.git
+cd educare/flutter_application
+
+# Instalar dependências do Flutter
+flutter pub get
+
+# Rodar no dispositivo conectado
+flutter run
+````
+
+---
+
+## 🔌 Firmware ESP32
+
+### 🔹 Tecnologias usadas
+
+* Arduino Core for ESP32
+* Biblioteca `BluetoothSerial.h`
+
+### 🔹 Upload do código
+
+1. Abra o arquivo `esp32_firmware/educare_esp32.ino` no Arduino IDE.
+2. Selecione a placa **ESP32 Dev Module**.
+3. Conecte o ESP32 via USB e envie o código.
+4. O dispositivo aparecerá como **"EDUCARE"** para pareamento Bluetooth.
+
+---
+
+## 📋 Roadmap
+
+* [x] Conexão Bluetooth com ESP32
+* [x] Receber dados dos botões físicos no app
+* [x] Feedback visual na interface
+* [ ] Enviar comandos do app para o hardware
+* [ ] Adicionar interface multissensorial no app
+* [ ] Integração com IA adaptativa
+* [ ] Versão web/offline com sincronização
+
+---
+
+## 🤝 Contribuindo
+
+1. Faça um fork do repositório.
+2. Crie uma branch para sua feature:
+
+   ```bash
+   git checkout -b minha-feature
+   ```
+3. Envie suas alterações:
+
+   ```bash
+   git commit -m 'Minha nova feature'
+   git push origin minha-feature
+   ```
+4. Abra um Pull Request.
+
+---
+
+## 📄 Licença
+
+Este projeto está licenciado sob a [MIT License](LICENSE).
+
+---
+
+## 👨‍💻 Autor
+
+**Seu Nome**
+📧 [seuemail@example.com](mailto:seuemail@example.com)
+🔗 [LinkedIn](https://linkedin.com/in/seu-perfil) | [GitHub](https://github.com/seu-usuario)
+
+```
+
+---
+
+Se você quiser, posso agora **juntar o README completo e revisado** com esse bloco já corrigido, para você só copiar e colar no seu repositório. Quer que eu te envie o arquivo inteiro pronto?
+```
+
