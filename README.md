@@ -1,3 +1,9 @@
+Perfeito, ajustei o link do LinkedIn.
+Segue o **README.md** final, já revisado e pronto para uso no GitHub:
+
+---
+
+```markdown
 # 📚 Educare — Plataforma Figital de Aprendizagem Inclusiva
 
 > **Educare** é um protótipo *figital* (físico + digital) que conecta hardware baseado em ESP32 a um aplicativo Flutter, promovendo uma aprendizagem mais acessível, engajadora e adaptada para crianças com necessidades especiais, especialmente aquelas no **Transtorno do Espectro Autista (TEA)**.
@@ -23,19 +29,22 @@ Combinamos **interação física** e **inteligência digital** para criar experi
 
 ## 🛠 Estrutura do Projeto
 
+```
+
 educare/
 │
-├── flutter_application/ # Aplicativo Flutter
-│ ├── lib/
-│ │ ├── main.dart # App principal e UI
-│ │ └── services/ # Serviços de conexão Bluetooth
-│ ├── pubspec.yaml # Configurações e dependências
+├── flutter\_application/       # Aplicativo Flutter
+│   ├── lib/
+│   │   ├── main.dart           # App principal e UI
+│   │   └── services/           # Serviços de conexão Bluetooth
+│   ├── pubspec.yaml            # Configurações e dependências
 │
-├── esp32_firmware/ # Código Arduino para o ESP32
-│ └── educare_esp32.ino
+├── esp32\_firmware/             # Código Arduino para o ESP32
+│   └── educare\_esp32.ino
 │
-└── docs/ # Documentação e futuros recursos visuais
+└── docs/                       # Documentação e futuros recursos visuais
 
+````
 
 ---
 
@@ -46,17 +55,11 @@ educare/
 - [`flutter_bluetooth_serial`](https://pub.dev/packages/flutter_bluetooth_serial) (modificado localmente)
 - [Permission Handler](https://pub.dev/packages/permission_handler) para Android 12+
 
-Entendi, você quer que eu **corrija e formate** essa parte para que fique consistente e profissional dentro do README.
-Segue a versão ajustada e organizada:
-
----
-
-
 ### 🔹 Instalação
 
 ```bash
 # Clonar o repositório
-git clone https://github.com/seu-usuario/educare.git
+git clone https://github.com/petrusjuca/educare.git
 cd educare/flutter_application
 
 # Instalar dependências do Flutter
@@ -122,14 +125,11 @@ Este projeto está licenciado sob a [MIT License](LICENSE).
 
 ## 👨‍💻 Autor
 
-**Seu Nome**
-📧 [seuemail@example.com](mailto:seuemail@example.com)
-🔗 [LinkedIn](https://linkedin.com/in/seu-perfil) | [GitHub](https://github.com/seu-usuario)
+**Petrus Jucá**
+📧 [jucapetrus0@gmail.com](mailto:jucapetrus0@gmail.com)
+🔗 [LinkedIn](https://linkedin.com/in/petrus-juca) | [GitHub](https://github.com/petrusjuca)
 
-```
 
----
 
-Se você quiser, posso agora **juntar o README completo e revisado** com esse bloco já corrigido, para você só copiar e colar no seu repositório. Quer que eu te envie o arquivo inteiro pronto?
 ```
 
