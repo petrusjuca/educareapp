@@ -1,12 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+          xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- APPLICATION -->
     <application
         android:label="Educare"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         tools:replace="android:label">
-        
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -17,44 +18,42 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- Tema inicial da Activity -->
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
-            
+
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Não remover: usado pelo Flutter -->
+        <!-- Flutter embedding marker (não remova) -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
 
-    <!-- Permissões Bluetooth -->
+    <!-- PERMISSÕES (sem duplicatas) -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+
+    <!-- Android 12+ (runtime) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- Localização (necessária para discovery em Android < 12) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Queries necessárias -->
+    <!-- Opcional: indica que o app usa BLE (ajuda Play Store / dispositivos) -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+
+    <!-- Queries necessárias para Process Text (padrão do template Flutter) -->
     <queries>
         <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
         </intent>
     </queries>
-
-    <!-- Bluetooth permissions required for flutter_blue_plus -->
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-
-    <!-- New permissions for Android 12 and above -->
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 </manifest>
