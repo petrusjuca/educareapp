@@ -31,7 +31,7 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
   BluetoothCharacteristic? targetCharacteristic;
 
   StreamSubscription<List<ScanResult>>? scanResultsSub;
-  StreamSubscription<BluetoothDeviceState>? deviceStateSub;
+  StreamSubscription<BluetoothConnectionState>? deviceStateSub;
   StreamSubscription<List<int>>? notifySub;
 
   String received = "";
@@ -63,7 +63,7 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
     super.dispose();
   }
 
-  // ---------- FLOW PRINCIPAL ----------
+  // ------------------ FLUXO PRINCIPAL ------------------
   Future<void> _ensureConnectedFlow() async {
     final ok = await _requestPermissions();
     if (!ok) {
@@ -75,7 +75,6 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
     if (!btOn) {
       final result = await _showConfirm("Bluetooth desligado", "O Bluetooth está desligado. Deseja ativá-lo?");
       if (result == true) {
-        // tenta ligar programaticamente (pode não funcionar em todas as ROMs)
         try {
           await FlutterBluePlus.turnOn();
         } catch (_) {}
@@ -86,45 +85,27 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
     await _tryConnectWithRetries();
   }
 
-  // ---------- PERMISSÕES (permission_handler ^11.2.0) ----------
+  // ------------------ PERMISSÕES ------------------
   Future<bool> _requestPermissions() async {
     try {
-      // Construir lista de permissões a pedir dependendo da plataforma / API
-      final toRequest = <Permission>[];
+      final toRequest = <Permission>[
+        Permission.bluetoothScan,
+        Permission.bluetoothConnect,
+        Permission.bluetooth,
+        Permission.locationWhenInUse,
+        Permission.location,
+      ];
 
-      // Para Android 12+ pedimos bluetoothScan/bluetoothConnect; para versões antigas, Location é necessário para discovery.
-      if (Platform.isAndroid) {
-        // permission_handler define essas permissões (v11+)
-        if (Permission.bluetoothScan.isDefined) toRequest.add(Permission.bluetoothScan);
-        if (Permission.bluetoothConnect.isDefined) toRequest.add(Permission.bluetoothConnect);
-        if (Permission.bluetooth.isDefined) toRequest.add(Permission.bluetooth);
-        // Localização (discovery em Android <12)
-        if (Permission.locationWhenInUse.isDefined) toRequest.add(Permission.locationWhenInUse);
-        if (Permission.location.isDefined) toRequest.add(Permission.location);
-      } else if (Platform.isIOS) {
-        // iOS: pedimos quando/if needed (ex.: bluetooth)
-        if (Permission.bluetooth.isDefined) toRequest.add(Permission.bluetooth);
-      } else {
-        // outras plataformas: apenas location como fallback
-        if (Permission.locationWhenInUse.isDefined) toRequest.add(Permission.locationWhenInUse);
-      }
+      final statuses = await toRequest.request();
 
-      // remover duplicados (set)
-      final uniq = toRequest.toSet().toList();
-
-      // Solicitar todas
-      final statuses = await uniq.request();
-
-      // Verifica se alguma foi negada permanentemente
-      for (var p in uniq) {
+      for (var p in toRequest) {
         final s = statuses[p];
         if (s == null) continue;
         if (s.isDenied || s.isPermanentlyDenied || s.isRestricted) {
-          print("Permissão negada ou restrita: $p -> $s");
+          print("❌ Permissão negada: $p");
           return false;
         }
       }
-
       return true;
     } catch (e) {
       print("Erro ao solicitar permissões: $e");
@@ -132,19 +113,19 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
     }
   }
 
-  // ---------- CHECK BLUETOOTH ON ----------
+  // ------------------ CHECAR BLUETOOTH ------------------
   Future<bool> _isBluetoothOn() async {
     try {
-      final state = await FlutterBluePlus.instance.state.first;
-      print("Estado do Bluetooth: $state");
-      return state == BluetoothState.on;
+      final state = await FlutterBluePlus.adapterState.first;
+      print("📡 Estado do Bluetooth: $state");
+      return state == BluetoothAdapterState.on;
     } catch (e) {
       print("Erro ao verificar estado bluetooth: $e");
       return false;
     }
   }
 
-  // ---------- RETRIES E SCAN ----------
+  // ------------------ TENTATIVAS DE CONEXÃO ------------------
   Future<void> _tryConnectWithRetries() async {
     int attempt = 0;
     while (attempt < maxRetries && !isConnected) {
@@ -152,11 +133,11 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
       print("Tentativa $attempt / $maxRetries");
       final found = await _startScanAndConnect(timeout: Duration(seconds: scanTimeoutSeconds));
       if (found && isConnected) {
-        print("Conectado na tentativa $attempt");
+        print("✅ Conectado na tentativa $attempt");
         return;
       } else {
         final again = await _showConfirm("EDUCARE não encontrado", "Deseja tentar novamente? (Tentativa $attempt/$maxRetries)");
-        if (!again) return;
+        if (again != true) return;
       }
     }
 
@@ -182,7 +163,7 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
       scanResultsSub = FlutterBluePlus.scanResults.listen((results) async {
         for (final r in results) {
           final name = r.device.name;
-          print("Scan: $name (${r.device.id})");
+          print("🔍 Scan: $name (${r.device.id})");
           if (name == deviceName) {
             deviceFound = true;
             await FlutterBluePlus.stopScan();
@@ -197,7 +178,7 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
 
       FlutterBluePlus.isScanning.listen((isScanning) {
         if (!isScanning && !deviceFound && !completer.isCompleted) {
-          if (!completer.isCompleted) completer.complete(false);
+          completer.complete(false);
         }
       });
 
@@ -217,43 +198,35 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
     }
   }
 
-  // ---------- CONEXÃO & NOTIFICAÇÕES ----------
+  // ------------------ CONEXÃO E NOTIFICAÇÕES ------------------
   Future<bool> _connectToDevice() async {
     if (targetDevice == null) return false;
 
     try {
-      // Conectar (com timeout)
-      try {
-        final st = await targetDevice!.state.first;
-        if (st == BluetoothDeviceState.connected) {
-          isConnected = true;
-          print("Já conectado (reuso).");
-        } else {
-          await targetDevice!.connect(timeout: const Duration(seconds: 10));
-          isConnected = true;
-          print("Conectado a ${targetDevice!.name}");
-        }
-      } catch (e) {
-        // fallback
+      final st = await targetDevice!.connectionState.first;
+      if (st == BluetoothConnectionState.connected) {
+        isConnected = true;
+        print("♻️ Já conectado.");
+      } else {
         await targetDevice!.connect(timeout: const Duration(seconds: 10));
         isConnected = true;
-        print("Conectado (fallback) a ${targetDevice!.name}");
+        print("✅ Conectado a ${targetDevice!.name}");
       }
 
       deviceStateSub?.cancel();
-      deviceStateSub = targetDevice!.state.listen((state) {
-        print("Device state: $state");
-        if (state == BluetoothDeviceState.disconnected) {
+      deviceStateSub = targetDevice!.connectionState.listen((state) {
+        print("🔌 Estado do dispositivo: $state");
+        if (state == BluetoothConnectionState.disconnected) {
           isConnected = false;
           targetCharacteristic = null;
-          _showConfirm("Conexão perdida", "Conexão com EDUCARE perdida. Reconectar?").then((retry) {
+          _showConfirm("Conexão perdida", "Reconectar ao EDUCARE?").then((retry) {
             if (retry == true) _ensureConnectedFlow();
           });
         }
       });
 
       final services = await targetDevice!.discoverServices();
-      print("Serviços: ${services.length}");
+      print("📂 Serviços: ${services.length}");
 
       BluetoothCharacteristic? found;
       for (var s in services) {
@@ -267,56 +240,37 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
       }
 
       if (found == null) {
-        print("Característica compatível não encontrada.");
-        return true; // conectado, mas sem char
+        print("⚠️ Característica não encontrada.");
+        return true; // conectado mas sem característica
       }
 
       targetCharacteristic = found;
 
       if (targetCharacteristic!.properties.notify) {
-        try {
-          await targetCharacteristic!.setNotifyValue(true);
-          notifySub?.cancel();
-          notifySub = targetCharacteristic!.value.listen((value) {
-            if (value.isEmpty) return;
-            print("Raw: $value");
-            try {
-              final letra = utf8.decode(value).trim();
-              print("Recebido: '$letra'");
-              setState(() => received = letra);
-            } catch (e) {
-              print("Erro decode: $e");
-            }
-          }, onError: (err) {
-            print("Erro notify stream: $err");
-          }, onDone: () {
-            print("Notify stream done.");
-          });
-        } catch (e) {
-          print("Falha notify: $e");
-        }
+        await targetCharacteristic!.setNotifyValue(true);
+        notifySub?.cancel();
+        notifySub = targetCharacteristic!.value.listen((value) {
+          if (value.isEmpty) return;
+          print("📥 Raw: $value");
+          try {
+            final letra = utf8.decode(value).trim();
+            print("📥 Recebido: '$letra'");
+            setState(() => received = letra);
+          } catch (e) {
+            print("Erro decode: $e");
+          }
+        });
       }
 
       return true;
     } catch (e) {
-      print("Erro conectar: $e");
+      print("❌ Erro conectar: $e");
       isConnected = false;
       return false;
     }
   }
 
-  // ---------- AÇÕES / VERIFICAÇÃO ANTES DE USAR ----------
-  Future<bool> _ensureConnectionBeforeAction() async {
-    if (isConnected && targetDevice != null) return true;
-    final retry = await _showConfirm("Sem conexão", "App não está conectado ao EDUCARE. Deseja tentar reconectar?");
-    if (retry == true) {
-      await _ensureConnectedFlow();
-      return isConnected;
-    }
-    return false;
-  }
-
-  // ---------- UI / MODAIS ----------
+  // ------------------ UI HELPERS ------------------
   Future<void> _showAlert(String title, String message) async {
     if (!mounted) return;
     await showDialog(
@@ -344,7 +298,17 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
     );
   }
 
-  // ---------- BOTÕES ----------
+  Future<bool> _ensureConnectionBeforeAction() async {
+    if (isConnected && targetDevice != null) return true;
+    final retry = await _showConfirm("Sem conexão", "Deseja reconectar ao EDUCARE?");
+    if (retry == true) {
+      await _ensureConnectedFlow();
+      return isConnected;
+    }
+    return false;
+  }
+
+  // ------------------ BOTÕES ------------------
   Widget _buildButton(String letra) {
     final ativo = received == letra;
     return ElevatedButton(
@@ -355,14 +319,14 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
         if (targetCharacteristic != null && targetCharacteristic!.properties.write) {
           try {
             final bytes = utf8.encode(letra);
-            await targetCharacteristic!.write(bytes, withoutResponse: false);
+            await targetCharacteristic!.write(bytes);
             print("➡ Enviado: $letra");
           } catch (e) {
             print("Erro enviar: $e");
             await _showAlert("Erro", "Falha ao enviar comando: $e");
           }
         } else {
-          print("Característica não suporta escrita.");
+          print("⚠️ Característica não suporta escrita.");
         }
       },
       style: ElevatedButton.styleFrom(
