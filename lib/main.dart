@@ -30,17 +30,26 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
 
   Future<void> _connectToESP32() async {
     try {
+      // Lista dispositivos já pareados
       final devices = await FlutterBluetoothSerial.instance.getBondedDevices();
-      final esp = devices.firstWhere((d) => d.name == "EDUCARE",
-          orElse: () => throw Exception("ESP32 'EDUCARE' não emparelhado"));
+      final esp = devices.firstWhere(
+        (d) => d.name == "EDUCARE",
+        orElse: () => throw Exception("ESP32 'EDUCARE' não emparelhado"),
+      );
 
+      // Conecta ao ESP32
       connection = await BluetoothConnection.toAddress(esp.address);
       print("✅ Conectado a ${esp.name}");
 
+      // Escuta os dados recebidos
       connection!.input!.listen((data) {
+        print("📥 Dados brutos recebidos: $data"); // lista de bytes recebidos
         final letra = String.fromCharCodes(data).trim();
+        print("📥 Dados convertidos para string: '$letra'");
+
         setState(() => received = letra);
-        print("📥 Recebido: $letra");
+      }).onDone(() {
+        print("⚠️ Conexão Bluetooth encerrada pelo dispositivo ou app.");
       });
     } catch (e) {
       print("❌ Erro: $e");
