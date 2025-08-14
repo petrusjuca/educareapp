@@ -42,7 +42,7 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
 
   // Ajuste esses valores se quiser
   final String deviceName = "EDUCARE";
-  final String serviceUuid = "12345678-1234-1234-1234-1234567890ab";
+  final String serviceUuid = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
   final int scanTimeoutSeconds = 8;
   final int maxRetries = 8; // numero de tentativas automáticas
 
