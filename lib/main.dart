@@ -1,3 +1,4 @@
+// lib/main.dart
 import 'dart:async';
 import 'dart:convert' show utf8;
 import 'dart:io' show Platform;
@@ -37,10 +38,13 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
   String received = "";
   bool isConnected = false;
   bool scanning = false;
+  bool userCancelledScan = false;
 
+  // Ajuste esses valores se quiser
   final String deviceName = "EDUCARE";
+  final String serviceUuid = "12345678-1234-1234-1234-1234567890ab";
   final int scanTimeoutSeconds = 8;
-  final int maxRetries = 4;
+  final int maxRetries = 8; // numero de tentativas automáticas
 
   @override
   void initState() {
@@ -52,6 +56,7 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
 
   @override
   void dispose() {
+    userCancelledScan = true;
     scanResultsSub?.cancel();
     deviceStateSub?.cancel();
     notifySub?.cancel();
@@ -67,7 +72,7 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
   Future<void> _ensureConnectedFlow() async {
     final ok = await _requestPermissions();
     if (!ok) {
-      await _showAlert("Permissões", "Permissões necessárias não concedidas. O app não funcionará corretamente.");
+      await _showAlert("Permissões", "Permissões necessárias não concedidas. O app pode não funcionar corretamente.");
       return;
     }
 
@@ -125,50 +130,78 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
     }
   }
 
-  // ------------------ TENTATIVAS DE CONEXÃO ------------------
+  // ------------------ TENTATIVAS DE CONEXÃO (AUTO-RETRY) ------------------
   Future<void> _tryConnectWithRetries() async {
     int attempt = 0;
-    while (attempt < maxRetries && !isConnected) {
+    userCancelledScan = false;
+
+    while (attempt < maxRetries && !isConnected && !userCancelledScan) {
       attempt++;
-      print("Tentativa $attempt / $maxRetries");
+      print("Auto-scan tentativa $attempt / $maxRetries");
       final found = await _startScanAndConnect(timeout: Duration(seconds: scanTimeoutSeconds));
       if (found && isConnected) {
         print("✅ Conectado na tentativa $attempt");
         return;
-      } else {
-        final again = await _showConfirm("EDUCARE não encontrado", "Deseja tentar novamente? (Tentativa $attempt/$maxRetries)");
-        if (again != true) return;
       }
+
+      // espera curta antes de tentar novamente (evita loop agressivo)
+      await Future.delayed(const Duration(seconds: 1));
     }
 
-    if (!isConnected) {
+    if (!isConnected && !userCancelledScan) {
       await _showAlert("Falha", "Não foi possível conectar ao EDUCARE após $maxRetries tentativas.");
     }
   }
 
   Future<bool> _startScanAndConnect({required Duration timeout}) async {
     try {
-      await FlutterBluePlus.stopScan();
-    } catch (_) {}
+      // garante que scan anterior esteja parado
+      try {
+        await FlutterBluePlus.stopScan();
+      } catch (_) {}
 
-    bool deviceFound = false;
-    scanning = true;
-    setState(() {});
+      bool deviceFound = false;
+      scanning = true;
+      setState(() {});
 
-    final completer = Completer<bool>();
+      final completer = Completer<bool>();
 
-    try {
+      // inicia scan sem depender exclusivamente do timeout — o código usa o timeout para cada tentativa,
+      // mas se um dispositivo válido aparecer a callback resolve o completer imediatamente.
       FlutterBluePlus.startScan(timeout: timeout);
 
       scanResultsSub = FlutterBluePlus.scanResults.listen((results) async {
         for (final r in results) {
-          final name = r.device.name;
-          print("🔍 Scan: $name (${r.device.id})");
-          if (name == deviceName) {
+          final name = r.device.name ?? "";
+          final adv = r.advertisementData;
+          bool matchesService = false;
+          try {
+            // verificação simples: se alguma serviceUuid conter parte do UUID
+            if (adv != null && adv.serviceUuids.isNotEmpty) {
+              for (var u in adv.serviceUuids) {
+                if (u.toLowerCase().contains(serviceUuid.split('-')[0])) {
+                  matchesService = true;
+                  break;
+                }
+              }
+            }
+          } catch (_) {}
+
+          final matchesName = name == deviceName || name.toLowerCase().contains(deviceName.toLowerCase());
+          final matches = matchesName || matchesService;
+
+          print("🔍 Scan found: '${name}' / id=${r.device.id} / matchesService=$matchesService");
+
+          if (matches) {
             deviceFound = true;
-            await FlutterBluePlus.stopScan();
+            // para o scan e cancela o listener
+            try {
+              await FlutterBluePlus.stopScan();
+            } catch (_) {}
             await scanResultsSub?.cancel();
+
             targetDevice = r.device;
+            // tenta conectar
             final connected = await _connectToDevice();
             if (!completer.isCompleted) completer.complete(connected);
             break;
@@ -176,7 +209,8 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
         }
       });
 
-      FlutterBluePlus.isScanning.listen((isScanning) {
+      // Observa quando o scan realmente termina (ex.: timeout)
+      final scanningSub = FlutterBluePlus.isScanning.listen((isScanning) {
         if (!isScanning && !deviceFound && !completer.isCompleted) {
           completer.complete(false);
         }
@@ -187,10 +221,10 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
         return false;
       });
 
+      await scanningSub.cancel();
       return result;
     } catch (e) {
       print("Erro no scan: $e");
-      if (!completer.isCompleted) completer.complete(false);
       return false;
     } finally {
       scanning = false;
@@ -203,45 +237,75 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
     if (targetDevice == null) return false;
 
     try {
-      final st = await targetDevice!.connectionState.first;
-      if (st == BluetoothConnectionState.connected) {
-        isConnected = true;
-        print("♻️ Já conectado.");
-      } else {
+      // Conectar (tenta reconectar se já estiver conectado)
+      try {
+        final st = await targetDevice!.connectionState.first;
+        if (st == BluetoothConnectionState.connected) {
+          isConnected = true;
+          print("♻️ Já conectado.");
+        } else {
+          await targetDevice!.connect(timeout: const Duration(seconds: 10));
+          isConnected = true;
+          print("✅ Conectado a ${targetDevice!.name}");
+        }
+      } catch (e) {
+        // fallback: tentar conectar de novo
         await targetDevice!.connect(timeout: const Duration(seconds: 10));
         isConnected = true;
-        print("✅ Conectado a ${targetDevice!.name}");
+        print("✅ Conectado (fallback) a ${targetDevice!.name}");
       }
 
+      // listener do estado do device
       deviceStateSub?.cancel();
       deviceStateSub = targetDevice!.connectionState.listen((state) {
-        print("🔌 Estado do dispositivo: $state");
+        print("🔌 Device state: $state");
         if (state == BluetoothConnectionState.disconnected) {
           isConnected = false;
           targetCharacteristic = null;
-          _showConfirm("Conexão perdida", "Reconectar ao EDUCARE?").then((retry) {
-            if (retry == true) _ensureConnectedFlow();
+          // tenta reconectar automaticamente (após pequena espera)
+          Future.delayed(const Duration(milliseconds: 500), () {
+            _ensureConnectedFlow();
           });
         }
       });
 
+      // Descobre serviços e escolhe a característica corretamente (filtrando por UUID do serviço se possível)
       final services = await targetDevice!.discoverServices();
       print("📂 Serviços: ${services.length}");
 
       BluetoothCharacteristic? found;
       for (var s in services) {
-        for (var c in s.characteristics) {
-          if (c.properties.notify || c.properties.read || c.properties.write) {
-            found = c;
-            break;
+        // tenta comparar UUIDs de serviço (caso o ESP exponha exatamente o serviceUuid)
+        final sUuid = s.uuid.toString().toLowerCase();
+        final want = serviceUuid.toLowerCase();
+        if (sUuid.contains(want.split('-')[0]) || sUuid == want) {
+          for (var c in s.characteristics) {
+            // preferimos uma característica com notify
+            if (c.properties.notify) {
+              found = c;
+              break;
+            }
           }
+          if (found != null) break;
         }
-        if (found != null) break;
+      }
+
+      // se não achou por serviço, procura pela primeira characteristic com notify em qualquer service
+      if (found == null) {
+        for (var s in services) {
+          for (var c in s.characteristics) {
+            if (c.properties.notify) {
+              found = c;
+              break;
+            }
+          }
+          if (found != null) break;
+        }
       }
 
       if (found == null) {
-        print("⚠️ Característica não encontrada.");
-        return true; // conectado mas sem característica
+        print("⚠️ Característica com notify não encontrada.");
+        return true; // conectado mas sem característica para receber
       }
 
       targetCharacteristic = found;
@@ -251,14 +315,17 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
         notifySub?.cancel();
         notifySub = targetCharacteristic!.value.listen((value) {
           if (value.isEmpty) return;
-          print("📥 Raw: $value");
           try {
             final letra = utf8.decode(value).trim();
-            print("📥 Recebido: '$letra'");
+            print("📥 Recebido raw: $value -> '$letra'");
             setState(() => received = letra);
           } catch (e) {
             print("Erro decode: $e");
           }
+        }, onError: (err) {
+          print("Erro notify stream: $err");
+        }, onDone: () {
+          print("Notify stream done.");
         });
       }
 
@@ -326,7 +393,7 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
             await _showAlert("Erro", "Falha ao enviar comando: $e");
           }
         } else {
-          print("⚠️ Característica não suporta escrita.");
+          print("⚠️ Característica não suporta escrita ou targetCharacteristic é null.");
         }
       },
       style: ElevatedButton.styleFrom(
@@ -354,11 +421,28 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
               const SizedBox(height: 12),
               Text("Status: ${isConnected ? 'Conectado' : (scanning ? 'Procurando...' : 'Desconectado')}"),
               const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () async {
-                  await _ensureConnectedFlow();
-                },
-                child: const Text("Conectar / Reconectar"),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton(
+                    onPressed: () async {
+                      // inicia fluxo de conexão manualmente
+                      await _ensureConnectedFlow();
+                    },
+                    child: const Text("Conectar / Reconectar"),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () async {
+                      // permite usuário cancelar scans automáticos
+                      userCancelledScan = true;
+                      await FlutterBluePlus.stopScan();
+                      await scanResultsSub?.cancel();
+                      setState(() {});
+                    },
+                    child: const Text("Parar Busca"),
+                  ),
+                ],
               )
             ],
           ),
