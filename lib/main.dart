@@ -376,33 +376,19 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
   }
 
   // ------------------ BOTÕES ------------------
-  Widget _buildButton(String letra) {
-    final ativo = received == letra;
-    return ElevatedButton(
-      onPressed: () async {
-        final ok = await _ensureConnectionBeforeAction();
-        if (!ok) return;
+// ------------------ BOTÕES (somente receber) ------------------
+Widget _buildButton(String letra) {
+  final ativo = received == letra;
+  return ElevatedButton(
+    onPressed: null, // desabilitado porque o app não envia nada
+    style: ElevatedButton.styleFrom(
+      backgroundColor: ativo ? Colors.green : Colors.grey,
+      minimumSize: const Size(120, 48),
+    ),
+    child: Text("Botão $letra"),
+  );
+}
 
-        if (targetCharacteristic != null && targetCharacteristic!.properties.write) {
-          try {
-            final bytes = utf8.encode(letra);
-            await targetCharacteristic!.write(bytes);
-            print("➡ Enviado: $letra");
-          } catch (e) {
-            print("Erro enviar: $e");
-            await _showAlert("Erro", "Falha ao enviar comando: $e");
-          }
-        } else {
-          print("⚠️ Característica não suporta escrita ou targetCharacteristic é null.");
-        }
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: ativo ? Colors.green : Colors.grey,
-        minimumSize: const Size(120, 48),
-      ),
-      child: Text("Botão $letra"),
-    );
-  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
